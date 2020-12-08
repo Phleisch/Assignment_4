@@ -6,7 +6,7 @@
 
 // Define number of work items and work groups
 #define NUM_WORK_GROUPS 1
-#define NUM_WORK_ITEMS_PER_GROUP 256
+#define NUM_WORK_ITEMS_PER_DIM 16
 #define KERNEL_FILEPATH "hello_world.cl"
 
 // This is a macro for checking the error variable.
@@ -94,11 +94,11 @@ int main(int argc, char *argv) {
   printf("created kernel\n");
   /* Parameters about number of work groups and number of work items per work
    * group to execute the kernel with */
-  size_t n_workitem[1] = {NUM_WORK_ITEMS_PER_GROUP};
+  size_t n_workitem[2] = {NUM_WORK_ITEMS_PER_DIM, NUM_WORK_ITEMS_PER_DIM};
   size_t workgroup_size[1] = {NUM_WORK_GROUPS};
 
   cl_event event;
-  err = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, NULL, n_workitem, workgroup_size, 0, NULL, NULL);CHK_ERROR(err);
+  err = clEnqueueNDRangeKernel(cmd_queue, kernel, 2, NULL, n_workitem, workgroup_size, 0, NULL, NULL);CHK_ERROR(err);
 
   printf("launched the kernel\n");
   /* Wait and make sure everything finished */
@@ -113,8 +113,6 @@ int main(int argc, char *argv) {
   
   return 0;
 }
-
-
 
 // The source for this particular version is from: https://stackoverflow.com/questions/24326432/convenient-way-to-show-opencl-error-codes
 const char* clGetErrorString(int errorCode) {
