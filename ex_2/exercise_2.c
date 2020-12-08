@@ -8,18 +8,62 @@
 #define NUM_WORK_ITEMS_PER_GROUP 256
 #define ARRAY_SIZE 10000
 
+#define KERNEL_FILEPATH "./kernel.cl"
+
 // This is a macro for checking the error variable.
 #define CHK_ERROR(err) if ((err) != CL_SUCCESS) fprintf(stderr,"Error: %s\n",clGetErrorString(err));
 
 // A errorCode to string converter (forward declaration)
 const char* clGetErrorString(int);
 
-const char *mykernel =
-"__kernel void SAXPY(float a, float *X, float *Y) {\n"
-"	 int index = get_global_id(0);		             	 \n"
-"  if (index >= ARRAY_SIZE) return;                \n"
-"	 Y[index] += a * X[index];                       \n"
-"}														                     \n";
+cl_program compileKernelBoilerplate(
+	char *kernelFilepath, cl_context context, cl_device_id *device_list) {
+	cl_int err;
+	char *sourceCode = 0;
+	long fileLength;
+	FILE *kernelFile = fopen (kernelFilepath, "rb");
+
+	// File does not exist or is not accessible
+	if (kernelFile == NULL) {
+		fprintf(stderr, "Could not open %s\n", kernelFilepath);
+		return NULL;
+	}
+
+
+	fseek (kernelFile, 0, SEEK_END);
+	fileLength = ftell (kernelFile);
+	fseek (kernelFile, 0, SEEK_SET);
+	sourceCode = (char *) malloc(fileLength);
+
+	// Could not allocate space for sourceCode
+	if (sourceCode == NULL) {
+		fprintf(stderr, "Malloc failed\n");
+		return NULL;
+	}
+
+	fread (sourceCode, 1, fileLength, kernelFile);
+	fclose (kernelFile);
+
+	/* Create the OpenCL program */
+	cl_program program = clCreateProgramWithSource(
+			context, 1, (const char**) &sourceCode, NULL, &err);
+	CHK_ERROR(err);
+
+	err = clBuildProgram(program, 1, device_list, NULL, NULL, NULL);
+	CHK_ERROR(err);
+
+	if (err != CL_SUCCESS) {
+		size_t len;
+		char buffer[2048];
+		clGetProgramBuildInfo(
+				program, device_list[0], CL_PROGRAM_BUILD_LOG, sizeof(buffer),
+				buffer, &len);
+		fprintf(stderr, "Build error: %s\n", buffer);
+		exit(0);
+	}
+
+	return program;
+}
 
 int assert_equal(float *A, float *B, size_t array_size) {
   for (int i = 0; i < array_size; ++i) {
@@ -65,19 +109,14 @@ int main(int argc, char *argv) {
   CHK_ERROR(err); 
 
   /* Create the OpenCL program */
-  cl_program program = clCreateProgramWithSource(context, 1,
-      (const char **) &mykernel, NULL, &err);
-  CHK_ERROR(err);
+  cl_program program = compileKernelBoilerplate(KERNEL_FILEPATH, context,
+      device_list);
 
   /* Create a kernel object referencing our "hello_world" kernel */
-  cl_kernel kernel = clCreateKernel(program, "hello_world", &err);
+  cl_kernel kernel = clCreateKernel(program, "SAXPY", &err);
   CHK_ERROR(err);
 
-  /* Build the code */
-  err = clBuildProgram(program, 1, device_list, NULL, NULL, NULL);
-  CHK_ERROR(err);
-
-  size_t n_workitem = NUM_WORK_ITEMS_PER_GROUP;
+  size_t n_workitem = ARRAY_SIZE;
   size_t workgroup_size =
     ARRAY_SIZE + (NUM_WORK_ITEMS_PER_GROUP -1) / ARRAY_SIZE;
 
@@ -111,11 +150,12 @@ int main(int argc, char *argv) {
   cpu_SAXPY(a, X, Y_reference, ARRAY_SIZE);
 
   /* Enqueue the kernel */
+  size_t array_size = ARRAY_SIZE;
   err = clSetKernelArg(kernel, 0, sizeof(float), (void *) &a);
   CHK_ERROR(err);
-  err = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &X_dev);
+  err = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *) &X_dev);
   CHK_ERROR(err);
-  err = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &Y_dev);
+  err = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *) &Y_dev);
   CHK_ERROR(err);
 
   err = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, NULL, &n_workitem, 
