@@ -7,7 +7,7 @@
 // Define number of work items and work groups
 #define NUM_WORK_GROUPS 1
 #define NUM_WORK_ITEMS_PER_GROUP 256
-#define KERNEL_FILEPATH hello_world.cl
+#define KERNEL_FILEPATH "hello_world.cl"
 
 // This is a macro for checking the error variable.
 #define CHK_ERROR(err) if (err != CL_SUCCESS) fprintf(stderr,"Error: %s\n",clGetErrorString(err));
@@ -15,22 +15,17 @@
 // A errorCode to string converter (forward declaration)
 const char* clGetErrorString(int);
 
-const char *hello_world =
-"__kernel void hello_world() {					\n"\
-"	int index = get_global_id(0);				\n"\
-"	printf('Hello World! My threadId is %d\n', index);	\n"\
-"}								";
-
-cl_program compileKernelBoilerplate(char *kernelFilepath, cl_context, context) {
+cl_program compileKernelBoilerplate(
+	char *kernelFilepath, cl_context context, cl_device_id *device_list) {
 	cl_int err;
 	char *sourceCode = 0;
 	long fileLength;
-	FILE *kernelFile = fopen (filename, "rb");
+	FILE *kernelFile = fopen (kernelFilepath, "rb");
 
 	// File does not exist or is not accessible
 	if (kernelFile == NULL) {
 		fprintf(stderr, "Could not open %s\n", kernelFilepath);
-		return errno;
+		return NULL;
 	}
 
 
@@ -42,10 +37,10 @@ cl_program compileKernelBoilerplate(char *kernelFilepath, cl_context, context) {
 	// Could not allocate space for sourceCode
 	if (sourceCode == NULL) {
 		fprintf(stderr, "Malloc failed\n");
-		return errno;
+		return NULL;
 	}
 
-	fread (sourceCode, 1, length, f);
+	fread (sourceCode, 1, fileLength, kernelFile);
 	fclose (kernelFile);
 
 	/* Create the OpenCL program */
@@ -91,7 +86,7 @@ int main(int argc, char *argv) {
 
   printf("\n");
   
-  cl_program program = compileKernelBoilerplate(KERNEL_FILEPATH, context);
+  cl_program program = compileKernelBoilerplate(KERNEL_FILEPATH, context, device_list);
 
   /* Create a kernel object referencing our "hello_world" kernel */
   cl_kernel kernel = clCreateKernel(program, "hello_world", &err);CHK_ERROR(err);
