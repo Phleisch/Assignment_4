@@ -14,11 +14,15 @@
 // A errorCode to string converter (forward declaration)
 const char* clGetErrorString(int);
 
-const char *mykernel =
-"__kernel void hello_world() {							\n"
-"	int index = get_global_id(0);						\n"
-"	printf(\"Hello World! My threadId is %d\n\", index);\n"
-"}														\n";
+const char *hello_world =
+"__kernel void hello_world() {					\n"\
+"	int index = get_global_id(0);				\n"\
+"	printf('Hello World! My threadId is %d\n', index);	\n"\
+"}								";
+
+cl_int compileKernelBoilerplate(char *kernelFilepath) {
+  
+}
 
 int main(int argc, char *argv) {
   cl_platform_id * platforms; cl_uint     n_platform;
@@ -40,15 +44,25 @@ int main(int argc, char *argv) {
   // Create a command queue
   cl_command_queue cmd_queue = clCreateCommandQueue(context, device_list[0], 0, &err);CHK_ERROR(err); 
 
+  printf("\n");
   /* Create the OpenCL program */
-  cl_program program = clCreateProgramWithSource(context, 1, (const char**) &mykernel, NULL, &err);CHK_ERROR(err);
+  cl_program program = clCreateProgramWithSource(context, 1, (const char**) &hello_world, NULL, &err);CHK_ERROR(err);
 
+  printf("Created cl program\n");
   /* Build the code */
   err = clBuildProgram(program, 1, device_list, NULL, NULL, NULL);CHK_ERROR(err);
-  
+  if (err != CL_SUCCESS) {
+    size_t len;
+    char buffer[2048];
+    clGetProgramBuildInfo(program, device_list[0], CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
+    fprintf(stderr, "Build error: %s\n", buffer); exit(0);
+  }
+
+  printf("built the code\n");
   /* Create a kernel object referencing our "hello_world" kernel */
   cl_kernel kernel = clCreateKernel(program, "hello_world", &err);CHK_ERROR(err);
 
+  printf("created kernel\n");
   /* Parameters about number of work groups and number of work items per work
    * group to execute the kernel with */
   size_t n_workitem[1] = {NUM_WORK_ITEMS_PER_GROUP};
@@ -57,6 +71,7 @@ int main(int argc, char *argv) {
   cl_event event;
   err = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, NULL, n_workitem, workgroup_size, 0, NULL, NULL);CHK_ERROR(err);
 
+  printf("launched the kernel\n");
   /* Wait and make sure everything finished */
   err = clFlush(cmd_queue);CHK_ERROR(err);
   err = clFinish(cmd_queue);CHK_ERROR(err);
