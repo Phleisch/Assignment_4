@@ -43,12 +43,14 @@ int main(int argc, char *argv) {
   /* Create the OpenCL program */
   cl_program program = clCreateProgramWithSource(context, 1, (const char**) &mykernel, NULL, &err);CHK_ERROR(err);
 
+  /* Build the code */
+  err = clBuildProgram(program, 1, device_list, NULL, NULL, NULL);CHK_ERROR(err);
+  
   /* Create a kernel object referencing our "hello_world" kernel */
   cl_kernel kernel = clCreateKernel(program, "hello_world", &err);CHK_ERROR(err);
 
-  /* Build the code */
-  err = clBuildProgram(program, 1, device_list, NULL, NULL, NULL);CHK_ERROR(err);
-
+  /* Parameters about number of work groups and number of work items per work
+   * group to execute the kernel with */
   size_t n_workitem[1] = {NUM_WORK_ITEMS_PER_GROUP};
   size_t workgroup_size[1] = {NUM_WORK_GROUPS};
 
