@@ -1,0 +1,11 @@
+# OBJECT
+*.o
+
+# Compiled programs
+*.out
+
+# Ctags
+tags
+
+# OS GENERATED
+.DS_Store
