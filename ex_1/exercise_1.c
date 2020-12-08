@@ -7,6 +7,7 @@
 // Define number of work items and work groups
 #define NUM_WORK_GROUPS 1
 #define NUM_WORK_ITEMS_PER_GROUP 256
+#define KERNEL_FILEPATH hello_world.cl
 
 // This is a macro for checking the error variable.
 #define CHK_ERROR(err) if (err != CL_SUCCESS) fprintf(stderr,"Error: %s\n",clGetErrorString(err));
@@ -20,8 +21,52 @@ const char *hello_world =
 "	printf('Hello World! My threadId is %d\n', index);	\n"\
 "}								";
 
-cl_int compileKernelBoilerplate(char *kernelFilepath) {
-  
+cl_program compileKernelBoilerplate(char *kernelFilepath, cl_context, context) {
+	cl_int err;
+	char *sourceCode = 0;
+	long fileLength;
+	FILE *kernelFile = fopen (filename, "rb");
+
+	// File does not exist or is not accessible
+	if (kernelFile == NULL) {
+		fprintf(stderr, "Could not open %s\n", kernelFilepath);
+		return errno;
+	}
+
+
+	fseek (kernelFile, 0, SEEK_END);
+	fileLength = ftell (kernelFile);
+	fseek (kernelFile, 0, SEEK_SET);
+	sourceCode = (char *) malloc(fileLength);
+
+	// Could not allocate space for sourceCode
+	if (sourceCode == NULL) {
+		fprintf(stderr, "Malloc failed\n");
+		return errno;
+	}
+
+	fread (sourceCode, 1, length, f);
+	fclose (kernelFile);
+
+	/* Create the OpenCL program */
+	cl_program program = clCreateProgramWithSource(
+			context, 1, (const char**) &sourceCode, NULL, &err);
+	CHK_ERROR(err);
+
+	err = clBuildProgram(program, 1, device_list, NULL, NULL, NULL);
+	CHK_ERROR(err);
+
+	if (err != CL_SUCCESS) {
+		size_t len;
+		char buffer[2048];
+		clGetProgramBuildInfo(
+				program, device_list[0], CL_PROGRAM_BUILD_LOG, sizeof(buffer),
+				buffer, &len);
+		fprintf(stderr, "Build error: %s\n", buffer);
+		exit(0);
+	}
+
+	return program;
 }
 
 int main(int argc, char *argv) {
@@ -45,20 +90,9 @@ int main(int argc, char *argv) {
   cl_command_queue cmd_queue = clCreateCommandQueue(context, device_list[0], 0, &err);CHK_ERROR(err); 
 
   printf("\n");
-  /* Create the OpenCL program */
-  cl_program program = clCreateProgramWithSource(context, 1, (const char**) &hello_world, NULL, &err);CHK_ERROR(err);
+  
+  cl_program program = compileKernelBoilerplate(KERNEL_FILEPATH, context);
 
-  printf("Created cl program\n");
-  /* Build the code */
-  err = clBuildProgram(program, 1, device_list, NULL, NULL, NULL);CHK_ERROR(err);
-  if (err != CL_SUCCESS) {
-    size_t len;
-    char buffer[2048];
-    clGetProgramBuildInfo(program, device_list[0], CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
-    fprintf(stderr, "Build error: %s\n", buffer); exit(0);
-  }
-
-  printf("built the code\n");
   /* Create a kernel object referencing our "hello_world" kernel */
   cl_kernel kernel = clCreateKernel(program, "hello_world", &err);CHK_ERROR(err);
 
