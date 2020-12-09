@@ -5,8 +5,8 @@
 #include <CL/cl.h>
 
 // Define number of work items and work groups
-#define NUM_WORK_GROUPS 1
-#define NUM_WORK_ITEMS_PER_DIM 16
+#define NUM_WORK_GROUPS 4
+#define NUM_WORK_ITEMS_PER_DIM 4
 #define KERNEL_FILEPATH "hello_world.cl"
 
 // This is a macro for checking the error variable.
@@ -94,7 +94,7 @@ int main(int argc, char *argv) {
   printf("created kernel\n");
   /* Parameters about number of work groups and number of work items per work
    * group to execute the kernel with */
-  size_t n_workitem[2] = {NUM_WORK_ITEMS_PER_DIM, NUM_WORK_ITEMS_PER_DIM};
+  size_t n_workitem[3] = {WORK_ITEMS_PER_DIM, WORK_ITEMS_PER_DIM, WORK_ITEMS_PER_DIM};
   size_t workgroup_size[1] = {NUM_WORK_GROUPS};
 
   cl_event event;
