@@ -1,5 +1,5 @@
 # automatic compilation and run for tegner or lab
-STATION=lab
+STATION=tegner
 
 EXEC:=exercise_2.out
 OBJ:=exercise_2.o
@@ -16,7 +16,7 @@ else
 endif
 
 NVCC:=nvcc
-NVFLAGS:=-lOpenCL
+NVFLAGS:= -arch=${ARCH} -lOpenCL
 
 
 all: ${EXEC}
@@ -34,7 +34,7 @@ alloc:
 	salloc -A edu20.dd2360 -C Haswell -t 0:05:00 --gres=gpu:K420:1 --nodes=1
 
 tags:
-	ctags --langmap=c++:+.cu *.cu *.c *.h
+	ctags --langmap=c++:+.cl --langmap=c++:+.cu *.cu *.c *.h
 
 clean:
 	${RM} *.o ${EXEC}

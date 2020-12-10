@@ -112,7 +112,7 @@ int main(int argc, char *argv) {
   cl_program program = compileKernelBoilerplate(KERNEL_FILEPATH, context,
       device_list);
 
-  /* Create a kernel object referencing our "hello_world" kernel */
+  /* Create a kernel object referencing our "SAXPY" kernel */
   cl_kernel kernel = clCreateKernel(program, "SAXPY", &err);
   CHK_ERROR(err);
 
