@@ -1,8 +1,8 @@
 # automatic compilation and run for tegner or lab
 STATION=tegner
 
-EXEC:=exercise_2.out
-OBJ:=exercise_2.o
+EXEC:=exercise_1.out
+OBJ:=exercise_1.o
 
 PARAM:=
 
