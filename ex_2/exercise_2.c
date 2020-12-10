@@ -134,9 +134,8 @@ int main(int argc, char **argv) {
   cl_kernel kernel = clCreateKernel(program, "SAXPY", &err);
   CHK_ERROR(err);
 
-  size_t n_workitem = ARRAY_SIZE;
-  size_t workgroup_size =
-    (ARRAY_SIZE + (NUM_WORK_ITEMS_PER_GROUP - 1)) / NUM_WORK_ITEMS_PER_GROUP;
+  size_t n_workitem = ((ARRAY_SIZE + (NUM_WORK_ITEMS_PER_GROUP - 1)) / NUM_WORK_ITEMS_PER_GROUP) * NUM_WORK_ITEMS_PER_GROUP;
+  size_t workgroup_size = NUM_WORK_ITEMS_PER_GROUP;
 
   /* Host arguments */
   size_t byte_size = ARRAY_SIZE * sizeof(float);
