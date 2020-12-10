@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>		// For use of gettimeofday function
 #include <CL/cl.h>
 
 // Define number of work items and work groups
@@ -65,10 +66,21 @@ cl_program compileKernelBoilerplate(
 	return program;
 }
 
+/**
+ * Return a timestamp with double precision.
+ */
+double cpuSecond() {
+	struct timeval tp;
+	gettimeofday(&tp,NULL);
+	return ((double)tp.tv_sec + (double)tp.tv_usec*1.e-6);
+}
+
 int assert_equal(float *A, float *B, size_t array_size) {
   for (int i = 0; i < array_size; ++i) {
-    if (abs(A[i] - B[i]) < 0.00001)
+    if (abs(A[i] - B[i]) > 0.00001) {
+      printf("Not equal in index %d: %f vs %f\n", i, A[i], B[i]);
       return 0;
+    }
   }
   return 1;
 }
@@ -104,8 +116,8 @@ int main(int argc, char *argv) {
   CHK_ERROR(err);
 
   // Create a command queue
-  cl_command_queue cmd_queue =
-    clCreateCommandQueue(context, device_list[0], 0, &err);
+  cl_command_queue cmd_queue = clCreateCommandQueue(context, device_list[0],
+      CL_QUEUE_PROFILING_ENABLE, &err);
   CHK_ERROR(err); 
 
   /* Create the OpenCL program */
@@ -118,7 +130,7 @@ int main(int argc, char *argv) {
 
   size_t n_workitem = ARRAY_SIZE;
   size_t workgroup_size =
-    ARRAY_SIZE + (NUM_WORK_ITEMS_PER_GROUP -1) / ARRAY_SIZE;
+    (ARRAY_SIZE + (NUM_WORK_ITEMS_PER_GROUP - 1)) / NUM_WORK_ITEMS_PER_GROUP;
 
   /* Host arguments */
   size_t byte_size = ARRAY_SIZE * sizeof(float);
@@ -127,7 +139,7 @@ int main(int argc, char *argv) {
   for (int i = 0; i < ARRAY_SIZE; ++i) {
     X[i] = 2.f * i;
     Y[i] = -1.f * i;
-    Y[i] = -1.f * i;
+    Y_reference[i] = -1.f * i;
   }
 
   /* Allocate device buffers */
@@ -147,7 +159,10 @@ int main(int argc, char *argv) {
   CHK_ERROR(err);
 
   /* Compute CPU result */
+	double startTime = cpuSecond();
+  printf("Computing SAXPY on the CPU... ");
   cpu_SAXPY(a, X, Y_reference, ARRAY_SIZE);
+	printf("Done in %f seconds.\n", cpuSecond() - startTime);
 
   /* Enqueue the kernel */
   size_t array_size = ARRAY_SIZE;
@@ -158,8 +173,9 @@ int main(int argc, char *argv) {
   err = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *) &Y_dev);
   CHK_ERROR(err);
 
+  cl_event event;
   err = clEnqueueNDRangeKernel(cmd_queue, kernel, 1, NULL, &n_workitem, 
-      &workgroup_size, 0, NULL, NULL);
+      &workgroup_size, 0, NULL, &event);
   CHK_ERROR(err);
 
   /* Get result back to the host */
@@ -168,10 +184,23 @@ int main(int argc, char *argv) {
   CHK_ERROR(err);
 
   /* Wait and make sure everything finished */
+  printf("Computing SAXPY on the GPU... ");
   err = clFlush(cmd_queue);
+  CHK_ERROR(err);
+  err = clWaitForEvents(1, &event);
   CHK_ERROR(err);
   err = clFinish(cmd_queue);
   CHK_ERROR(err);
+
+  cl_ulong time_start;
+  cl_ulong time_end;
+  clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START,
+      sizeof(time_start), &time_start, NULL);
+  clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END,
+      sizeof(time_end), &time_end, NULL);
+  double nano_seconds = time_end - time_start;
+
+	printf("Done in %f seconds.\n", nano_seconds / 1e9);
 
   // Finally, release all that we have allocated.
   err = clReleaseCommandQueue(cmd_queue);
@@ -183,9 +212,9 @@ int main(int argc, char *argv) {
 
   /* Check result */
   if (!assert_equal(Y_reference, Y, ARRAY_SIZE))
-    printf("Error: arrays are different");
+    printf("Error: arrays are different\n");
   else
-    printf("Success: arrays are equal");
+    printf("Success: arrays are equal\n");
 
   
   return 0;
