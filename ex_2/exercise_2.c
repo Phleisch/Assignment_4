@@ -7,7 +7,7 @@
 
 // Define number of work items and work groups
 #define NUM_WORK_ITEMS_PER_GROUP 256
-#define ARRAY_SIZE 10000
+//#define ARRAY_SIZE 10000
 
 #define KERNEL_FILEPATH "./kernel.cl"
 
@@ -91,7 +91,13 @@ void cpu_SAXPY(float a, float *X, float *Y, size_t array_size) {
   }
 }
 
-int main(int argc, char *argv) {
+int main(int argc, char **argv) {
+#ifndef ARRAY_SIZE
+  if (argc != 2)
+    printf("Usage: %s <ARRAY_SIZE>\nOr define ARRAY_SIZE.\n", argv[0]);
+  size_t ARRAY_SIZE = atoi(argv[1]);
+  printf("%ld,", ARRAY_SIZE);
+#endif
   cl_platform_id * platforms; cl_uint     n_platform;
 
   // Find OpenCL Platforms
@@ -160,9 +166,15 @@ int main(int argc, char *argv) {
 
   /* Compute CPU result */
 	double startTime = cpuSecond();
+#ifdef ARRAY_SIZE
   printf("Computing SAXPY on the CPU... ");
+#endif
   cpu_SAXPY(a, X, Y_reference, ARRAY_SIZE);
+#ifdef ARRAY_SIZE
 	printf("Done in %f seconds.\n", cpuSecond() - startTime);
+#else
+	printf("%f,", cpuSecond() - startTime);
+#endif
 
   /* Enqueue the kernel */
   cl_ulong array_size = ARRAY_SIZE;
@@ -186,7 +198,9 @@ int main(int argc, char *argv) {
   CHK_ERROR(err);
 
   /* Wait and make sure everything finished */
+#ifdef ARRAY_SIZE
   printf("Computing SAXPY on the GPU... ");
+#endif
   err = clFlush(cmd_queue);
   CHK_ERROR(err);
   err = clWaitForEvents(1, &event);
@@ -202,7 +216,11 @@ int main(int argc, char *argv) {
       sizeof(time_end), &time_end, NULL);
   double nano_seconds = time_end - time_start;
 
+#ifdef ARRAY_SIZE
 	printf("Done in %f seconds.\n", nano_seconds / 1e9);
+#else
+	printf("%f\n", nano_seconds / 1e9);
+#endif
 
   // Finally, release all that we have allocated.
   err = clReleaseCommandQueue(cmd_queue);
@@ -213,10 +231,13 @@ int main(int argc, char *argv) {
   free(device_list);
 
   /* Check result */
-  if (!assert_equal(Y_reference, Y, ARRAY_SIZE))
+  if (!assert_equal(Y_reference, Y, ARRAY_SIZE)) {
     printf("Error: arrays are different\n");
-  else
+  } else {
+#ifdef ARRAY_SIZE
     printf("Success: arrays are equal\n");
+#endif
+  }
 
   
   return 0;
