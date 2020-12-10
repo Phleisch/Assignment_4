@@ -5,9 +5,17 @@
 #include <CL/cl.h>
 
 // Define number of work items and work groups
-#define NUM_WORK_GROUPS 4
-#define NUM_WORK_ITEMS_PER_DIM 4
-#define KERNEL_FILEPATH "hello_world.cl"
+
+// Number of dimensions used to specify work-items in a work-group
+#define WORK_DIM 		3
+
+// How many work-groups to create
+#define NUM_WORK_GROUPS 	4
+
+// Number of work-items per dimension (a work-group will have
+// WORK_ITEMS_PER_DIM^WORK_DIM work-items)
+#define WORK_ITEMS_PER_DIM 	4
+#define KERNEL_FILEPATH 	"hello_world.cl"
 
 // This is a macro for checking the error variable.
 #define CHK_ERROR(err) if (err != CL_SUCCESS) fprintf(stderr,"Error: %s\n",clGetErrorString(err));
@@ -15,12 +23,12 @@
 // A errorCode to string converter (forward declaration)
 const char* clGetErrorString(int);
 
-cl_program compileKernelBoilerplate(
+cl_program compileKernel(
 	char *kernelFilepath, cl_context context, cl_device_id *device_list) {
 	cl_int err;
 	char *sourceCode = 0;
 	long fileLength;
-	FILE *kernelFile = fopen (kernelFilepath, "rb");
+	FILE *kernelFile = fopen(kernelFilepath, "r");
 
 	// File does not exist or is not accessible
 	if (kernelFile == NULL) {
@@ -28,9 +36,8 @@ cl_program compileKernelBoilerplate(
 		return NULL;
 	}
 
-
 	fseek (kernelFile, 0, SEEK_END);
-	fileLength = ftell (kernelFile);
+	fileLength = ftell(kernelFile);
 	fseek (kernelFile, 0, SEEK_SET);
 	sourceCode = (char *) malloc(fileLength);
 
@@ -65,49 +72,62 @@ cl_program compileKernelBoilerplate(
 }
 
 int main(int argc, char *argv) {
-  cl_platform_id * platforms; cl_uint     n_platform;
+  cl_platform_id * platforms; cl_uint n_platform;
 
   // Find OpenCL Platforms
-  cl_int err = clGetPlatformIDs(0, NULL, &n_platform); CHK_ERROR(err);
+  cl_int err = clGetPlatformIDs(0, NULL, &n_platform);
+  CHK_ERROR(err);
   platforms = (cl_platform_id *) malloc(sizeof(cl_platform_id)*n_platform);
-  err = clGetPlatformIDs(n_platform, platforms, NULL); CHK_ERROR(err);
+  err = clGetPlatformIDs(n_platform, platforms, NULL);
+  CHK_ERROR(err);
 
   // Find and sort devices
   cl_device_id *device_list; cl_uint n_devices;
-  err = clGetDeviceIDs( platforms[0], CL_DEVICE_TYPE_GPU, 0,NULL, &n_devices);CHK_ERROR(err);
+  err = clGetDeviceIDs( platforms[0], CL_DEVICE_TYPE_GPU, 0,NULL, &n_devices);
+  CHK_ERROR(err);
   device_list = (cl_device_id *) malloc(sizeof(cl_device_id)*n_devices);
-  err = clGetDeviceIDs( platforms[0],CL_DEVICE_TYPE_GPU, n_devices, device_list, NULL);CHK_ERROR(err);
+  err = clGetDeviceIDs( platforms[0],CL_DEVICE_TYPE_GPU, n_devices, device_list, NULL);
+  CHK_ERROR(err);
   
   // Create and initialize an OpenCL context
-  cl_context context = clCreateContext( NULL, n_devices, device_list, NULL, NULL, &err);CHK_ERROR(err);
+  cl_context context = clCreateContext( NULL, n_devices, device_list, NULL, NULL, &err);
+  CHK_ERROR(err);
 
   // Create a command queue
-  cl_command_queue cmd_queue = clCreateCommandQueue(context, device_list[0], 0, &err);CHK_ERROR(err); 
+  cl_command_queue cmd_queue = clCreateCommandQueue(context, device_list[0], 0, &err);
+  CHK_ERROR(err); 
 
-  printf("\n");
-  
-  cl_program program = compileKernelBoilerplate(KERNEL_FILEPATH, context, device_list);
+  printf("about to compile the kernel...\n");
+  // Try to compile the kernel found at KERNEL_FILEPATH and create a program
+  cl_program program = compileKernel(KERNEL_FILEPATH, context, device_list);
 
   /* Create a kernel object referencing our "hello_world" kernel */
-  cl_kernel kernel = clCreateKernel(program, "hello_world", &err);CHK_ERROR(err);
+  cl_kernel kernel = clCreateKernel(program, "hello_world", &err);
+  CHK_ERROR(err);
 
-  printf("created kernel\n");
   /* Parameters about number of work groups and number of work items per work
    * group to execute the kernel with */
-  size_t n_workitem[3] = {WORK_ITEMS_PER_DIM, WORK_ITEMS_PER_DIM, WORK_ITEMS_PER_DIM};
-  size_t workgroup_size[1] = {NUM_WORK_GROUPS};
+  size_t n_workitem[WORK_DIM] = {
+	  NUM_WORK_GROUPS * WORK_ITEMS_PER_DIM, WORK_ITEMS_PER_DIM,
+	  WORK_ITEMS_PER_DIM};
+  size_t workgroup_size[WORK_DIM] = {
+	  WORK_ITEMS_PER_DIM, WORK_ITEMS_PER_DIM, WORK_ITEMS_PER_DIM};
 
   cl_event event;
-  err = clEnqueueNDRangeKernel(cmd_queue, kernel, 2, NULL, n_workitem, workgroup_size, 0, NULL, NULL);CHK_ERROR(err);
+  err = clEnqueueNDRangeKernel(cmd_queue, kernel, 3, NULL, n_workitem, workgroup_size, 0, NULL, NULL);
+  CHK_ERROR(err);
 
-  printf("launched the kernel\n");
   /* Wait and make sure everything finished */
-  err = clFlush(cmd_queue);CHK_ERROR(err);
-  err = clFinish(cmd_queue);CHK_ERROR(err);
+  err = clFlush(cmd_queue);
+  CHK_ERROR(err);
+  err = clFinish(cmd_queue);
+  CHK_ERROR(err);
 
   // Finally, release all that we have allocated.
-  err = clReleaseCommandQueue(cmd_queue);CHK_ERROR(err);
-  err = clReleaseContext(context);CHK_ERROR(err);
+  err = clReleaseCommandQueue(cmd_queue);
+  CHK_ERROR(err);
+  err = clReleaseContext(context);
+  CHK_ERROR(err);
   free(platforms);
   free(device_list);
   
