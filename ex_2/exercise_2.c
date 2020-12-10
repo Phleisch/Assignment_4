@@ -165,12 +165,14 @@ int main(int argc, char *argv) {
 	printf("Done in %f seconds.\n", cpuSecond() - startTime);
 
   /* Enqueue the kernel */
-  size_t array_size = ARRAY_SIZE;
+  cl_ulong array_size = ARRAY_SIZE;
   err = clSetKernelArg(kernel, 0, sizeof(float), (void *) &a);
   CHK_ERROR(err);
   err = clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *) &X_dev);
   CHK_ERROR(err);
   err = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *) &Y_dev);
+  CHK_ERROR(err);
+  err = clSetKernelArg(kernel, 3, sizeof(cl_ulong), (void *) &array_size);
   CHK_ERROR(err);
 
   cl_event event;
