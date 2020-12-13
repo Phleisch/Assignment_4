@@ -243,13 +243,10 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles,
 
 	if (err != CL_SUCCESS) {
 		size_t len;
-		char buffer[2048];
+		char buffer[100000];
 		clGetProgramBuildInfo(program, device_list[0],
 			CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
-		printf("What da heck\n");
 		fprintf(stderr, "Build error: %s\n", buffer);
-		printf("seriously\n");
-		printf("%s\n", buffer);
 		exit(0);
 	}
 
@@ -270,6 +267,8 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles,
 	CHK_ERROR(err);
 
 	// Set arguments for the kernel
+	CHK_ERROR(
+		clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &deviceParticles));
 	CHK_ERROR(
 		clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &deviceParticles));
 	CHK_ERROR(clSetKernelArg(kernel, 1, sizeof(cl_float3), (void *) &field));
