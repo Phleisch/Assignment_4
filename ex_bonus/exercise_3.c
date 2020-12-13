@@ -181,6 +181,9 @@ char* getKernelSourceCode(char *kernelFilepath) {
 	return sourceCode;
 }
 
+/**
+ * Execute and time the host implementation of particle simulation.
+ */
 void runHostSimulation(Particle *hostParticles) {
 	populateParticleArray(hostParticles, NUM_PARTICLES);
 
@@ -195,11 +198,9 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
 	cl_platform_id * platforms; cl_uint n_platform;
 
 	// Find OpenCL Platforms
-	cl_int err = clGetPlatformIDs(0, NULL, &n_platform);
-	CHK_ERROR(err);
+	cl_int err = clGetPlatformIDs(0, NULL, &n_platform); CHK_ERROR(err);
 	platforms = (cl_platform_id *) malloc(sizeof(cl_platform_id)*n_platform);
-	err = clGetPlatformIDs(n_platform, platforms, NULL);
-	CHK_ERROR(err);
+	err = clGetPlatformIDs(n_platform, platforms, NULL); CHK_ERROR(err);
 
 	// Find and sort devices
 	cl_device_id *device_list; cl_uint n_devices;
@@ -212,13 +213,11 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
 
 	// Create and initialize an OpenCL context
 	cl_context context = clCreateContext(
-		NULL, n_devices, device_list, NULL, NULL, &err);
-	CHK_ERROR(err);
+		NULL, n_devices, device_list, NULL, NULL, &err); CHK_ERROR(err);
 
 	// Create a command queue
 	cl_command_queue cmd_queue = clCreateCommandQueue(
-			context, device_list[0], 0, &err);
-	CHK_ERROR(err); 
+			context, device_list[0], 0, &err); CHK_ERROR(err); 
 
 	printf("about to compile the kernel...\n");
 
@@ -227,8 +226,7 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
 
 	// Create an OpenCL program
 	cl_program program = clCreateProgramWithSource(
-			context, 1, (const char**) &sourceCode, NULL, &err);
-	CHK_ERROR(err);
+			context, 1, (const char**) &sourceCode, NULL, &err); CHK_ERROR(err);
 
 	err = clBuildProgram(program, 1, device_list, NULL, NULL, NULL);
 	CHK_ERROR(err);
@@ -249,18 +247,14 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
 
 	/* END OPENCL OVERHEAD */
 
-	
 	/* BEGIN EXECUTION OF THE DEVICE IMPLEMENTATION */
 	// Allocate device memory
 	cl_mem deviceParticles = clCreateBuffer(context, CL_MEM_READ_WRITE,
-			particleArraySize, NULL, &err);
-	CHK_ERROR(err);
-
+			particleArraySize, NULL, &err); CHK_ERROR(err);
 	
 	// Write to device memory
 	err = clEnqueueWriteBuffer(cmd_queue, deviceParticles, CL_TRUE, 0,
-			particleArraySize);
-	CHK_ERROR(err);
+			particleArraySize); CHK_ERROR(err);
 
 	// Set arguments for the kernel
 	CHK_ERROR(
@@ -275,9 +269,8 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
 	size_t workgroup_size[WORK_DIM] = {BLOCK_SIZE};
 
 	// Launch the kernel
-	err = clEnqueueNDRangeKernel(
-		  cmd_queue, kernel, WORK_DIM, NULL, n_workitem, workgroup_size, 0, NULL, NULL);
-	CHK_ERROR(err);
+	err = clEnqueueNDRangeKernel(cmd_queue, kernel, WORK_DIM, NULL, n_workitem,
+			workgroup_size, 0, NULL, NULL); CHK_ERROR(err);
 
 	// Get result back from the host
 	err = clEnqueueReadBuffer(cmd_queue, deviceParticles, CL_TRUE, 0,
@@ -285,10 +278,8 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
 	CHK_ERROR(err);
 
 	/* Wait and make sure everything finished */
-	err = clFlush(cmd_queue);
-	CHK_ERROR(err);
-	err = clFinish(cmd_queue);
-	CHK_ERROR(err);
+	err = clFlush(cmd_queue); CHK_ERROR(err);
+	err = clFinish(cmd_queue); CHK_ERROR(err);
 	/* END EXECUTION OF THE DEVICE IMPLEMENTATION */
 
 	// Finally, release all that we have allocated.
