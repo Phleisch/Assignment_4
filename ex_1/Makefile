@@ -1,5 +1,5 @@
 # automatic compilation and run for tegner or lab
-STATION=tegner
+STATION=lab
 
 EXEC:=exercise_1.out
 OBJ:=exercise_1.o
