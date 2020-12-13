@@ -1,4 +1,4 @@
-typedef struct {
+typedef struct __attribute__ ((packed)) {
   float3 position;
   float3 velocity;
 } Particle;
@@ -18,4 +18,6 @@ __kernel void particle_simulator(__global Particle *particles, float3 field, int
 	}
 	particles[threadId] = particle;
 }
+
+
 

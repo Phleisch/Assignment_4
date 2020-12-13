@@ -16,10 +16,10 @@
 #define CHK_ERROR(err) if (err != CL_SUCCESS) fprintf(stderr,"Error: %s\n",clGetErrorString(err));
 
 // Number of particles to simulate
-int NUM_PARTICLES = 16384;
+cl_int NUM_PARTICLES = 16384;
 
 // Number of times to simulate the movement (over 1 second) of a particle
-int NUM_ITERATIONS = 1;
+cl_int NUM_ITERATIONS = 1;
 
 // Number of work-items per work-group
 int BLOCK_SIZE = 128;
@@ -28,7 +28,7 @@ int BLOCK_SIZE = 128;
 cl_float3 field = (cl_float3) {0.f, 0.f, 9.8f};
 
 // Structure for particles
-typedef struct {
+typedef struct __attribute__ ((packed)) _Particle{
 	cl_float3 position;
 	cl_float3 velocity;
 } Particle;
@@ -102,6 +102,13 @@ void populateParticleArray(Particle *particles, int n) {
 		particle.velocity.x = 1.0 * ((float) rand() / (float) RAND_MAX);
 		particle.velocity.y = 1.0 * ((float) rand() / (float) RAND_MAX);
 		particle.velocity.z = 1.0 * ((float) rand() / (float) RAND_MAX);
+
+		particle.position.x = 10.0;
+		particle.position.y = 10.0;
+		particle.position.z = 10.0;
+		particle.velocity.x = 1.0;
+		particle.velocity.y = 1.0;
+		particle.velocity.z = 1.0;
 		particles[index] = particle;
 	}
 }
@@ -130,6 +137,15 @@ void compareSimulationResults(Particle *deviceOut, Particle *hostOut, int n) {
 		// the outcomes are too different
 		if (cumDiff > .001 || cumDiff < -.001) {
 			resultsAreEqual = 0;
+      printf("Array different at index %d:\n"\
+          "  host: position (%f, %f, %f), velocity (%f, %f, %f)\n"\
+          "  dev:  position (%f, %f, %f), velocity (%f, %f, %f)\n",
+          index, hostOut[index].position.x, hostOut[index].position.y,
+          hostOut[index].position.z, hostOut[index].velocity.x,
+          hostOut[index].velocity.y, hostOut[index].velocity.x,
+          deviceOut[index].position.x, deviceOut[index].position.y,
+          deviceOut[index].position.z, deviceOut[index].velocity.x,
+          deviceOut[index].velocity.y, deviceOut[index].velocity.x);
 			break;
 		}
 	}
@@ -269,11 +285,9 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles,
 	// Set arguments for the kernel
 	CHK_ERROR(
 		clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &deviceParticles));
-	CHK_ERROR(
-		clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *) &deviceParticles));
 	CHK_ERROR(clSetKernelArg(kernel, 1, sizeof(cl_float3), (void *) &field));
-	CHK_ERROR(clSetKernelArg(kernel, 2, sizeof(int), (void *) &NUM_PARTICLES));
-	CHK_ERROR(clSetKernelArg(kernel, 3, sizeof(int), (void *) &NUM_ITERATIONS));
+	CHK_ERROR(clSetKernelArg(kernel, 2, sizeof(cl_int), (void *) &NUM_PARTICLES));
+	CHK_ERROR(clSetKernelArg(kernel, 3, sizeof(cl_int), (void *) &NUM_ITERATIONS));
 
 	/* Parameters about number of work groups and number of work items per work
 	* group to execute the kernel with */
