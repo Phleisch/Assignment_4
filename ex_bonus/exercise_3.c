@@ -3,11 +3,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <CL/cl.h>
+#include <sys/time.h>
 
 // Number of dimensions used to specify work-items in a work-group
 #define WORK_DIM 			1
 #define KERNEL_FILEPATH 	"particle_simulator.cl"
 #define KERNEL_NAME			"particle_simulator"
+
+#define ABS(a) ((a) < 0 ? -(a) : (a))
 
 // This is a macro for checking the error variable.
 #define CHK_ERROR(err) if (err != CL_SUCCESS) fprintf(stderr,"Error: %s\n",clGetErrorString(err));
@@ -53,7 +56,7 @@ void updatePosition(Particle *particle) {
  * @param particle	Particle for which a velocity update will be performed
  * @param field		Rate of change for each dimension (x, y, z) of a velocity
  */
-void updateVelocity(Particle *particle, float3 field) {
+void updateVelocity(Particle *particle, cl_float3 field) {
 	particle->velocity.x = particle->velocity.x + field.x;
 	particle->velocity.y = particle->velocity.y + field.y;
 	particle->velocity.z = particle->velocity.z + field.z;
@@ -111,7 +114,7 @@ void populateParticleArray(Particle *particles, int n) {
  * @param n			The size of deviceOut and hostOut
  */
 void compareSimulationResults(Particle *deviceOut, Particle *hostOut, int n) {
-	bool resultsAreEqual = true;
+	int resultsAreEqual = 1;
 	printf("Comparing the output for each implementation... ");
 
 	for (int index = 0; index < n; index++) {
@@ -126,7 +129,7 @@ void compareSimulationResults(Particle *deviceOut, Particle *hostOut, int n) {
 		// Difference is larger than rounding-error tolerance of .001, means
 		// the outcomes are too different
 		if (cumDiff > .001 || cumDiff < -.001) {
-			resultsAreEqual = false;
+			resultsAreEqual = 0;
 			break;
 		}
 	}
@@ -150,7 +153,7 @@ void compareSimulationResults(Particle *deviceOut, Particle *hostOut, int n) {
 char* getKernelSourceCode(char *kernelFilepath) {
 	long fileLength;
 	char *sourceCode = 0;
-	FILE *kernelFile = fopen(kernelFilepath, "r");
+	FILE *kernelFile = fopen(kernelFilepath, "rb");
 
 	// File does not exist or is not accessible
 	if (kernelFile == NULL) {
@@ -179,21 +182,30 @@ char* getKernelSourceCode(char *kernelFilepath) {
 	fread (sourceCode, 1, fileLength, kernelFile);
 	fclose (kernelFile);
 	return sourceCode;
+
+}
+
+/**
+ * Return a timestamp with double precision
+ */
+double cpuSecond() {
+	struct timeval tp;
+	gettimeofday(&tp, NULL);
+	return ((double)tp.tv_sec + (double)tp.tv_usec*1.e-6);
 }
 
 /**
  * Execute and time the host implementation of particle simulation.
  */
 void runHostSimulation(Particle *hostParticles) {
-	populateParticleArray(hostParticles, NUM_PARTICLES);
-
 	// Execute and time the host particle simulator
 	double startTime = cpuSecond();
 	simulateParticlesHost(hostParticles, NUM_PARTICLES, NUM_ITERATIONS);
 	printf("CPU implementation took %f seconds\n", cpuSecond() - startTime);
 }
 
-void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
+void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles,
+		int particleArraySize) {
 	/* BEGIN OPENCL OVERHEAD */
 	cl_platform_id * platforms; cl_uint n_platform;
 
@@ -219,14 +231,12 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
 	cl_command_queue cmd_queue = clCreateCommandQueue(
 			context, device_list[0], 0, &err); CHK_ERROR(err); 
 
-	printf("about to compile the kernel...\n");
-
 	// Fetch the source code of the kernel found at KERNEL_FILEPATH
-	char* sourceCode = compileKernel(KERNEL_FILEPATH);
+	char* sourceCode = getKernelSourceCode(KERNEL_FILEPATH);
 
 	// Create an OpenCL program
 	cl_program program = clCreateProgramWithSource(
-			context, 1, (const char**) &sourceCode, NULL, &err); CHK_ERROR(err);
+		context, 1, (const char**) &sourceCode, NULL, &err); CHK_ERROR(err);
 
 	err = clBuildProgram(program, 1, device_list, NULL, NULL, NULL);
 	CHK_ERROR(err);
@@ -234,10 +244,12 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
 	if (err != CL_SUCCESS) {
 		size_t len;
 		char buffer[2048];
-		clGetProgramBuildInfo(
-				program, device_list[0], CL_PROGRAM_BUILD_LOG, sizeof(buffer),
-				buffer, &len);
+		clGetProgramBuildInfo(program, device_list[0],
+			CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
+		printf("What da heck\n");
 		fprintf(stderr, "Build error: %s\n", buffer);
+		printf("seriously\n");
+		printf("%s\n", buffer);
 		exit(0);
 	}
 
@@ -254,7 +266,8 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
 	
 	// Write to device memory
 	err = clEnqueueWriteBuffer(cmd_queue, deviceParticles, CL_TRUE, 0,
-			particleArraySize); CHK_ERROR(err);
+			particleArraySize, hostParticles, 0, NULL, NULL);
+	CHK_ERROR(err);
 
 	// Set arguments for the kernel
 	CHK_ERROR(
@@ -291,15 +304,15 @@ void runDeviceSimulation(Particle *hostParticles, Particle *saveDevParticles) {
 	free(device_list);
 }
 
-parseArguments(int argc, char **argv) {
-	NUM_PARTICLES = argc >= 2 ? atoi(argv[2]) : NUM_PARTICLES;
-	NUM_ITERATIONS = argc >= 3 ? atoi(argv[3]) : NUM_ITERATIONS;
-	BLOCK_SIZE = argc >= 4 ? atoi(argv[4]) : BLOCK_SIZE;
+void parseArguments(int argc, char **argv) {
+	NUM_PARTICLES 	= argc > 1 ? atoi(argv[1]) : NUM_PARTICLES;
+	NUM_ITERATIONS 	= argc > 2 ? atoi(argv[2]) : NUM_ITERATIONS;
+	BLOCK_SIZE 	= argc > 3 ? atoi(argv[3]) : BLOCK_SIZE;
 
 	printf("Running simulation with:\n\t"
 			"%d particles\n\t"
 			"%d iterations\n\t"
-			"%d block size",
+			"%d block size\n",
 			NUM_PARTICLES, NUM_ITERATIONS, BLOCK_SIZE
 	);
 }
@@ -308,16 +321,18 @@ int main(int argc, char **argv) {
 	// Get values for number of particles, iteration, and block size, or quit
 	parseArguments(argc, argv);
 
-	int particleArraySize = size(Particle) * NUM_PARTICLES;
+	int particleArraySize = sizeof(Particle) * NUM_PARTICLES;
 
 	// Allocate space to hold host particles and then populate the space
-	Particles *hostParticles = (Particle *) malloc(particleArraySize);
+	Particle *hostParticles = (Particle *) malloc(particleArraySize);
+
+	populateParticleArray(hostParticles, NUM_PARTICLES);
 
 	// Allocate space to hold the result of simulating device particles
-	Particles *devResult = (Particle *) malloc(particleArraySize);
+	Particle *devResult = (Particle *) malloc(particleArraySize);
 	
 	// Measure how long it takes to run the device implementation
-	runDeviceSimulation(hostParticles, devResult);
+	runDeviceSimulation(hostParticles, devResult, particleArraySize);
 	
 	// Measure how long it takes to run the host implementation
 	runHostSimulation(hostParticles);

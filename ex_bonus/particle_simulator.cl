@@ -1,32 +1,12 @@
-/**
- * Device implementation for the simulation of moving particles
- *
- * @param particles			List of particles for which to simulate movement
- * @param field				Values specifying the rate of change for a
- *							particle's velocity in each dimension
- * @param num_particles		# of particles, used to determine how many threads
- *							to give work if too many threads are initiated
- * @param num_iterations	# of timesteps a thread should simulate a particle
- */
-__kernel void particle_simulator(Particle *particles, cl_float3 field,
-	int num_particles, int num_iterations) {
-
-     // Unique ID of the current thread to determine what work to compute
-     int threadId = blockIdx.x * blockDim.x + threadIdx.x;
-
-     // This thread has no work to do, exit
-     if (threadId > num_particles) return;
-
-   // Get the right particle
-   Particle *particle = particles + threadId;
-
-   for (int i = 0; i < num_iterations; ++i) {
-     	// Update velocity first
+__kernel void particle_simulator(Particle *particles, cl_float3 field, int num_particles, int num_iterations) {
+	int threadId = 0;
+	if (threadId > num_particles) return;
+	Particle *particle = particles + threadId;
+	for (int i = 0; i < num_iterations; i++) {
 		particle->velocity.x = particle->velocity.x + field.x;
 		particle->velocity.y = particle->velocity.y + field.y;
-		particle->velocity.z = particle->velocity.z + field.z;
-
-     	// Update position
+		particle->velocity.z = particle->velocity.z + field.z,
+		
 		particle->position.x = particle->position.x + particle->velocity.x;
 		particle->position.y = particle->position.y + particle->velocity.y;
 		particle->position.z = particle->position.z + particle->velocity.z;
