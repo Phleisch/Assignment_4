@@ -1,5 +1,5 @@
 # automatic compilation and run for tegner or lab
-STATION=tegner
+STATION=lab
 
 EXEC:=exercise_2.out
 OBJ:=exercise_2.o
@@ -16,7 +16,7 @@ else
 endif
 
 NVCC:=nvcc
-NVFLAGS:= -arch=${ARCH} -lOpenCL
+NVFLAGS:=-lOpenCL
 
 
 all: ${EXEC}
